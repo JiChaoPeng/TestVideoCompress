@@ -8,19 +8,22 @@ import android.util.Log
 
 import java.io.File
 import java.io.IOException
+import java.nio.ByteBuffer
 
 /**
  * Created by jichaopeng
  * 2018/12/27
  */
 class Test {
-
     private val decodeColorFormat = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
     private val MIME_TYPE = "video/avc"
     private var outputImageFileType = -1
     private var OUTPUT_DIR: String? = null
     private lateinit var mediaMuxer: MediaMuxer
     private lateinit var decoder: MediaCodec
+    private lateinit var extractor: MediaExtractor
+    private var videoTrackIndex =0
+    private var videoMaxInputSize: Int=0
 
     fun initMuxer(url: String) {
         try {
@@ -37,7 +40,7 @@ class Test {
         }
     }
 
-    private fun initMediaCodec( ) {
+    private fun initMediaCodec() {
         val format = MediaFormat.createVideoFormat(MIME_TYPE, 640, 360)//MIME_TYPE = "video/avc",H264的MIME类型，宽，高
         format.setInteger(
             MediaFormat.KEY_COLOR_FORMAT,
@@ -46,8 +49,47 @@ class Test {
         format.setInteger(MediaFormat.KEY_BIT_RATE, 30)//设置比特率
         format.setInteger(MediaFormat.KEY_FRAME_RATE, 30)//设置帧率
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)//设置关键帧时间
-
         decoder = MediaCodec.createEncoderByType(MIME_TYPE)//创建编码器
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            decoder.setCallback(object : MediaCodec.Callback() {
+                override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
+
+                }
+
+                override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+                    // Subsequent data will conform to new format.
+                    // Can ignore if using getOutputFormat(outputBufferId)
+//                    mOutputFormat = format // option B
+                }
+
+                override fun onInputBufferAvailable(codec: MediaCodec, inputBufferId: Int) {
+                    val inputBuffer = codec.getInputBuffer(inputBufferId)
+//                    val buffer = ByteBuffer.allocate(videoMaxInputSize)
+                    if (inputBufferId >= 0) {
+                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                        if (sampleSize < 0) {
+                            decoder.queueInputBuffer(inputBufferId, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        } else {
+                            val presentationTimeUs = extractor.sampleTime
+                            decoder.queueInputBuffer(inputBufferId,0,sampleSize,0,0)
+                            extractor.advance()
+                        }
+                    }
+                }
+                override fun onOutputBufferAvailable(codec: MediaCodec,outputBufferId: Int,info: MediaCodec.BufferInfo) {
+                    val outputBuffer = codec.getOutputBuffer(outputBufferId)
+                    mediaMuxer.writeSampleData(videoTrackIndex, outputBuffer, info)
+                    codec.releaseOutputBuffer(outputBufferId, true)
+                    if (outputBufferId >= 0) {
+                        val doRender = info.size != 0
+                        if (doRender) {
+                            decoder.releaseOutputBuffer(outputBufferId, true)
+                        }
+                    }
+                }
+
+            })
+        }
         decoder.configure(
             format,
             null,
@@ -57,10 +99,9 @@ class Test {
         decoder.start()
     }
 
+
     @Throws(IOException::class)
     fun videoDecode(videoFilePath: String) {
-        var extractor: MediaExtractor? = null
-        var decoder: MediaCodec? = null
         initMuxer(videoFilePath)
 //        try {
         val videoFile = File(videoFilePath)
@@ -76,9 +117,11 @@ class Test {
         decoder = MediaCodec.createDecoderByType(MIME_TYPE)
 //            showSupportedColorFormat(decoder!!.codecInfo.getCapabilitiesForType(mime))
 
-        val format = MediaFormat.createVideoFormat(MIME_TYPE, mediaFormat.getInteger(MediaFormat.KEY_WIDTH), mediaFormat.getInteger(MediaFormat.KEY_HEIGHT))//MIME_TYPE = "video/avc",H264的MIME类型，宽，高
-
-
+        val format = MediaFormat.createVideoFormat(
+            MIME_TYPE,
+            mediaFormat.getInteger(MediaFormat.KEY_WIDTH),
+            mediaFormat.getInteger(MediaFormat.KEY_HEIGHT)
+        )//MIME_TYPE = "video/avc",H264的MIME类型，宽，高
 
         if (isColorFormatSupported(decodeColorFormat, decoder.codecInfo.getCapabilitiesForType(MIME_TYPE))) {
             mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, decodeColorFormat)
@@ -86,10 +129,14 @@ class Test {
         } else {
             Log.i(TAG, "unable to set decode color format, color format type $decodeColorFormat not supported")
         }
-        initMediaCodec( )
-        mediaMuxer.addTrack(mediaFormat)
+
+        videoTrackIndex = mediaMuxer.addTrack(mediaFormat)
+        mediaFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE).let { it ->
+            videoMaxInputSize = it
+        }
         mediaMuxer.start()
-        decodeFramesToImage(extractor, format)
+        initMediaCodec()
+//        decodeFramesToImage(extractor, format, videoTrackIndex)
 //            decoder.stop()
 //        } catch (e: java.lang.Exception) {
 //            Log.i(TAG, "AA:${e.message}${e.cause}")
@@ -123,54 +170,55 @@ class Test {
         }
         return false
     }
-
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private fun decodeFramesToImage(extractor: MediaExtractor, mediaFormat: MediaFormat) {
-        val info = MediaCodec.BufferInfo()
-        var sawInputEOS = false
-        var sawOutputEOS = false
-
-        val width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH)
-        val height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT)
-        var outputFrameCount = 0
-        while (!sawOutputEOS) {
-            if (!sawInputEOS) {
-                val inputBufferId = decoder.dequeueInputBuffer(DEFAULT_TIMEOUT_US)
-                if (inputBufferId >= 0) {
-                    val inputBuffer = decoder.getInputBuffer(inputBufferId)
-                    val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                    if (sampleSize < 0) {
-                        decoder.queueInputBuffer(inputBufferId, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                        sawInputEOS = true
-                    } else {
-                        val presentationTimeUs = extractor.sampleTime
-                        info.offset = 0
-                        info.size = sampleSize
-                        info.flags = extractor.sampleFlags
-                        mediaMuxer.writeSampleData(inputBufferId, inputBuffer, info)
-                        decoder.queueInputBuffer(inputBufferId, 0, sampleSize, presentationTimeUs, 0)
-                        extractor.advance()
-                    }
-                }
-            }
-            val outputBufferId = decoder.dequeueOutputBuffer(info,
-                DEFAULT_TIMEOUT_US
-            )
-            if (outputBufferId >= 0) {
-                if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
-                    sawOutputEOS = true
-                }
-                val doRender = info.size != 0
-                if (doRender) {
-                    outputFrameCount++
-                    decoder.releaseOutputBuffer(outputBufferId, true)
-                }
-            }
-        }
-        //全部写完后释放MediaMuxer和MediaExtractor
-        mediaMuxer.stop()
-        mediaMuxer.release()
-    }
+//
+//    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+//    private fun decodeFramesToImage(extractor: MediaExtractor, mediaFormat: MediaFormat, videoTrackIndex: Int) {
+//        val info = MediaCodec.BufferInfo()
+//        var sawInputEOS = false
+//        var sawOutputEOS = false
+//
+//        val width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH)
+//        val height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT)
+//        var outputFrameCount = 0
+////        while (!sawOutputEOS) {
+////            if (!sawInputEOS) {
+////                val inputBufferId = decoder.dequeueInputBuffer(DEFAULT_TIMEOUT_US)
+////                if (inputBufferId >= 0) {
+////                    val inputBuffer = decoder.getInputBuffer(inputBufferId)
+////                    val sampleSize = extractor.readSampleData(inputBuffer, 0)
+////                    if (sampleSize < 0) {
+////                        decoder.queueInputBuffer(inputBufferId, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+////                        sawInputEOS = true
+////                    } else {
+////                        val presentationTimeUs = extractor.sampleTime
+////                        info.offset = 0
+////                        info.size = sampleSize
+////                        info.flags = extractor.sampleFlags
+//////                        mediaMuxer.writeSampleData(videoTrackIndex, inputBuffer, info)
+////                        decoder.queueInputBuffer(inputBufferId, 0, sampleSize, presentationTimeUs, 0)
+////                        extractor.advance()
+////                    }
+////                }
+////            }
+////            val outputBufferId = decoder.dequeueOutputBuffer(
+////                info,
+////                DEFAULT_TIMEOUT_US
+////            )
+////            if (outputBufferId >= 0) {
+////                if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+////                    sawOutputEOS = true
+////                }
+////                val doRender = info.size != 0
+////                if (doRender) {
+////                    outputFrameCount++
+////                    decoder.releaseOutputBuffer(outputBufferId, true)
+////                }
+////            }
+////        }
+//        //全部写完后释放MediaMuxer和MediaExtractor
+////        mediaMuxer.stop()
+////        mediaMuxer.release()
+//    }
 
 
     companion object {
