@@ -1,4 +1,4 @@
-package com.wealoha.TestVideoCompress
+package com.wealoha.testvideocompress
 
 import android.media.MediaRecorder
 import android.os.Environment

@@ -1,18 +1,13 @@
-package com.wealoha.TestVideoCompress.video
+package com.wealoha.testvideocompress.video
 
 import android.annotation.TargetApi
 import android.graphics.ImageFormat
-import android.graphics.Rect
-import android.graphics.YuvImage
 import android.media.*
 import android.os.Build
 import android.util.Log
 
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
-import java.nio.ByteBuffer
-import java.util.concurrent.LinkedBlockingQueue
 
 /**
  * Created by jichaopeng

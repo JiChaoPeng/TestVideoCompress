@@ -1,4 +1,4 @@
-package com.wealoha.TestVideoCompress
+package com.wealoha.testvideocompress
 
 import android.view.View
 

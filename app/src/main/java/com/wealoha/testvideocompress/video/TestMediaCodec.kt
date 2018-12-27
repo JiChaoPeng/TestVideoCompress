@@ -1,25 +1,20 @@
-package com.wealoha.TestVideoCompress.video
+package com.wealoha.testvideocompress.video
 
-import android.media.MediaExtractor
-import android.media.MediaCodec
-import android.media.MediaFormat
-import android.media.MediaMuxer
+import android.media.*
 import android.util.Log
 import java.nio.ByteBuffer
-import android.media.MediaCodec.MetricsConstants.MIME_TYPE
-import android.media.MediaCodecInfo
 
 /**
  * Created by jichaopeng
  * 2018/12/26
  */
-class TestCompressMediaCodec {
+class TestMediaCodec {
     private val TAG = "VideoDecoder"
-    private var mediaDecoder: MediaCodec? = null
+    private val mediaDecoder: MediaCodec? = null
     private var mediaExtractor: MediaExtractor? = null
     private lateinit var mediaFormat: MediaFormat
     private lateinit var mediaMuxer: MediaMuxer
-    private var mime: String?=null
+    private var mime: String? = null
 
     fun decodeVideo(url: String, clipPoint: Long, clipDuration: Long): Boolean {
         var videoTrackIndex = -1
@@ -39,18 +34,18 @@ class TestCompressMediaCodec {
                 //创建合成器
                 mediaMuxer =
                         MediaMuxer(
-                            url.substring(0, url.lastIndexOf(".")) + "_output2.mp4",
+                            url.substring(0, url.lastIndexOf(".")) + "_output9.mp4",
                             MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4
                         )
             } catch (e: Exception) {
                 Log.e(TAG, "error path" + e.message)
             }
-            initMediaCodec()
+
             //获取每个轨道的信息
             for (i in 0 until it.trackCount) {
                 try {
                     mediaFormat = it.getTrackFormat(i)
-                    mime= mediaFormat.getString(MediaFormat.KEY_MIME)
+                    mime = mediaFormat.getString(MediaFormat.KEY_MIME)
                     mime?.let { it ->
                         if (it.startsWith("video/")) {
                             sourceVTrack = i
@@ -62,15 +57,36 @@ class TestCompressMediaCodec {
                             mediaFormat.getLong(MediaFormat.KEY_DURATION).let { it ->
                                 videoDuration = it
                             }
-                            val format = MediaFormat.createVideoFormat(MIME_TYPE, 640, 360)//MIME_TYPE = "video/avc",H264的MIME类型，宽，高
-                            format.setInteger(
+                            //检测剪辑点和剪辑时长是否正确
+                            if (clipPoint >= videoDuration) {
+                                Log.e(TAG, "clip point is error!")
+                                return false
+                            }
+                            if (clipDuration != 0L && clipDuration + clipPoint >= videoDuration) {
+                                Log.e(TAG, "clip duration is error!")
+                                return false
+                            }
+                            Log.d(
+                                TAG, "width and height is " + width + " " + height
+                                        + ";maxInputSize is " + videoMaxInputSize
+                                        + ";duration is " + videoDuration
+                            )
+                            mediaFormat.setInteger(MediaFormat.KEY_WIDTH, if (width > height) 640 else 360)
+                            mediaFormat.setInteger(MediaFormat.KEY_HEIGHT, if (height > width) 360 else 640)
+                            mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, 1)
+//                            val mediaFormat1 = MediaFormat.createVideoFormat(
+//                                MIME_TYPE,
+//                                320, 240
+//                            )
+                            mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, 1)
+                            mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, 1)
+                            mediaFormat.setInteger(
                                 MediaFormat.KEY_COLOR_FORMAT,
-                                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
-                            )//设置颜色格式
-//                            format.setInteger(MediaFormat.KEY_BIT_RATE, 30)//设置比特率
-                            format.setInteger(MediaFormat.KEY_FRAME_RATE, 30)//设置帧率
-                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)//设置关键帧时间
-                            videoTrackIndex = mediaMuxer.addTrack(format)
+                                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
+                            )
+                            mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 5)
+//                            mediaFormat.setInteger(MediaFormat.,1)
+                            videoTrackIndex = mediaMuxer.addTrack(mediaFormat)
                         } else if (it.startsWith("audio/")) {
                             sourceATrack = i
                             val sampleRate = mediaFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
@@ -148,7 +164,25 @@ class TestCompressMediaCodec {
                 mediaMuxer.writeSampleData(videoTrackIndex, inputBuffer, videoInfo)
                 videoInfo.presentationTimeUs += videoSampleTime//presentationTimeUs;
             }
-
+            //音频部分
+            it.selectTrack(sourceATrack)
+            val audioInfo = MediaCodec.BufferInfo()
+            audioInfo.presentationTimeUs = 0
+            val audioSampleTime: Long
+            //获取音频帧时长
+            run {
+                it.readSampleData(inputBuffer, 0)
+                //skip first sample
+                if (it.sampleTime == 0L)
+                    it.advance()
+                it.readSampleData(inputBuffer, 0)
+                val firstAudioPTS = it.sampleTime
+                it.advance()
+                it.readSampleData(inputBuffer, 0)
+                val secondAudioPTS = it.sampleTime
+                audioSampleTime = Math.abs(secondAudioPTS - firstAudioPTS)
+                Log.d(TAG, "AudioSampleTime is $audioSampleTime")
+            }
             it.seekTo(clipPoint, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
             while (true) {
                 val sampleSize = it.readSampleData(inputBuffer, 0)
@@ -167,10 +201,10 @@ class TestCompressMediaCodec {
                     break
                 }
                 it.advance()
-//                audioInfo.offset = 0
-//                audioInfo.size = sampleSize
-//                mediaMuxer.writeSampleData(audioTrackIndex, inputBuffer, audioInfo)
-//                audioInfo.presentationTimeUs += audioSampleTime//presentationTimeUs;
+                audioInfo.offset = 0
+                audioInfo.size = sampleSize
+                mediaMuxer.writeSampleData(audioTrackIndex, inputBuffer, audioInfo)
+                audioInfo.presentationTimeUs += audioSampleTime//presentationTimeUs;
             }
             //全部写完后释放MediaMuxer和MediaExtractor
             mediaMuxer.stop()
@@ -181,23 +215,5 @@ class TestCompressMediaCodec {
         }
     }
 
-    private fun initMediaCodec() {
-        val format = MediaFormat.createVideoFormat(MIME_TYPE, 640, 360)//MIME_TYPE = "video/avc",H264的MIME类型，宽，高
-        format.setInteger(
-            MediaFormat.KEY_COLOR_FORMAT,
-            MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
-        )//设置颜色格式
-        format.setInteger(MediaFormat.KEY_BIT_RATE, 30)//设置比特率
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, 30)//设置帧率
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)//设置关键帧时间
 
-        mediaDecoder = MediaCodec.createEncoderByType(MIME_TYPE)//创建编码器
-        mediaDecoder?.configure(
-            format,
-            null,
-            null,
-            MediaCodec.CONFIGURE_FLAG_ENCODE
-        )//四个参数，第一个是media格式，第二个是解码器播放的surfaceview，第三个是MediaCrypto，第四个是编码解码的标识
-        mediaDecoder?.start()
-    }
 }

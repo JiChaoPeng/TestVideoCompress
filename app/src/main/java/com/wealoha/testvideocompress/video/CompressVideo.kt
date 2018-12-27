@@ -1,4 +1,4 @@
-package com.wealoha.TestVideoCompress.video
+package com.wealoha.testvideocompress.video
 
 import android.media.MediaCodec
 import android.media.MediaFormat

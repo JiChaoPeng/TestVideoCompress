@@ -1,4 +1,4 @@
-package com.wealoha.TestVideoCompress
+package com.wealoha.testvideocompress
 
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
@@ -9,9 +9,9 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
-import com.wealoha.TestVideoCompress.video.CompressVideo
-import com.wealoha.TestVideoCompress.video.Test
-import com.wealoha.TestVideoCompress.video.TestMediaCodec
+import com.wealoha.testvideocompress.video.CompressVideo
+import com.wealoha.testvideocompress.video.Test
+import com.wealoha.testvideocompress.video.TestMediaCodec
 import com.wealoha.textapplication.R
 import kotlinx.android.synthetic.main.activity_main.*
 
@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
             isRecording = !isRecording
         }
         startCompress.onSingleClick {
-            var compressedFile = CompressVideo().getCompressedFile(mFilePath)
+            CompressVideo().getCompressedFile(mFilePath)
         }
         startCom1.onSingleClick {
             Test().videoDecode(mFilePath)
