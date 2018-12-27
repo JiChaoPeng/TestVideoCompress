@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="com.wealoha.TestVideoCompress.MainActivity">
+    <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/startRecording"
+            android:layout_margin="10dp"
+            android:layout_alignParentBottom="true"
+            android:background="@color/colorPrimary"
+            android:text="开始录音"/>
+    <TextView android:layout_width="100dp" android:layout_height="100dp"
+              android:layout_centerInParent="true"
+              android:background="@color/colorPrimary"
+              android:textColor="@color/app_white"
+              android:textSize="29sp"
+              android:visibility="gone"
+              android:id="@+id/startTime"
+              android:gravity="center"/>
+    <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/startCompress"
+            android:layout_marginTop="10dp"
+            android:background="@color/colorPrimary"
+            android:text="开始压缩"/>
+    <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/startClip"
+            android:layout_marginTop="70dp"
+            android:background="@color/colorPrimary"
+            android:text="开始剪辑"/>
+    <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/startCom1"
+            android:layout_marginTop="130dp"
+            android:background="@color/colorPrimary"
+            android:text="开始压缩1"/>
+</RelativeLayout>
