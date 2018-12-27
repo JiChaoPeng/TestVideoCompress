@@ -47,7 +47,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
         //开始剪辑
         startClip.onSingleClick {
             val mFilePath = Environment.getExternalStorageDirectory().absolutePath + "/123.mp4"
-            TestMediaCodec().decodeVideo(mFilePath,2000000,7000000)
+            TestMediaCodec().decodeVideo(mFilePath, 2000000, 7000000)
         }
         //开始录音
         startRecording.onSingleClick {
@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity(), Handler.Callback {
             CompressVideo().getCompressedFile(mFilePath)
         }
         startCom1.onSingleClick {
-            Test().videoDecode(mFilePath)
+                   Test().videoDecode(mFilePath)
         }
     }
 
