@@ -42,4 +42,18 @@
             android:layout_marginTop="130dp"
             android:background="@color/colorPrimary"
             android:text="开始压缩1"/>
+    <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/startCompressor"
+            android:layout_marginTop="190dp"
+            android:background="@color/colorPrimary"
+            android:text="startCompressor"/>
+    <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/startTranscoder"
+            android:layout_marginTop="250dp"
+            android:background="@color/colorPrimary"
+            android:text="startTranscoder"/>
 </RelativeLayout>

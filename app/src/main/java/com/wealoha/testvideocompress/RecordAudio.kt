@@ -1,5 +1,6 @@
 package com.wealoha.testvideocompress
 
+import android.content.Context
 import android.media.MediaRecorder
 import android.os.Environment
 import android.util.Log
@@ -12,30 +13,29 @@ import java.util.*
  * Created by jichaopeng
  * 2018/12/25
  */
-class RecordingUtil {
-
-    private var mRecorder: MediaRecorder? = null
-
+class RecordAudio (context: Context){
+    private var context:Context=context
+    companion object {
+        private var mRecorder: MediaRecorder? = null
+        private var path:String=""
+    }
     init {
         if (mRecorder == null) {
             mRecorder = MediaRecorder()
         }
     }
 
-    fun startRecording(): String {
-
+    fun startRecording() {
         mRecorder?.setAudioSource(MediaRecorder.AudioSource.MIC)
         //输出格式
         mRecorder?.setOutputFormat(MediaRecorder.OutputFormat.RAW_AMR)
         //设置音频编码器
         mRecorder?.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
-        val newFileName = newFileName()
-        mRecorder?.setOutputFile(newFileName)
-
+        path = newFileName()
+        mRecorder?.setOutputFile(path)
         try {
             // 准备好开始录音
             mRecorder?.prepare()
-
             mRecorder?.start()
         } catch (e: IllegalStateException) {
             // TODO Auto-generated catch block
@@ -44,10 +44,9 @@ class RecordingUtil {
             // TODO Auto-generated catch block
             e.printStackTrace()
         }
-        return newFileName
     }
 
-    fun stopRecording() {
+    fun stopRecording(inter : RecordAudioInterface) {
         if (mRecorder != null) {
             //added by ouyang start
             try {
@@ -57,27 +56,23 @@ class RecordingUtil {
                 mRecorder?.setOnInfoListener(null)
                 mRecorder?.setPreviewDisplay(null)
                 mRecorder?.stop()
-            } catch (e: IllegalStateException) {
-                Log.i("Exception", Log.getStackTraceString(e))
-            } catch (e: RuntimeException) {
-                Log.i("Exception", Log.getStackTraceString(e))
             } catch (e: Exception) {
                 Log.i("Exception", Log.getStackTraceString(e))
+                inter.onError(e.message)
             }
-            //added by ouyang end
             if (mRecorder != null) {
                 mRecorder?.release()
                 mRecorder = null
             }
-//            upRecord()
+            inter.onSucceed(path)
         }
     }
 
     private fun newFileName(): String {
-        val mFileName = Environment.getExternalStorageDirectory().absolutePath
+        val mFilePath = DirectoryExtension.getCacheDirectory(context,android.os.Environment.DIRECTORY_MUSIC)
         val s = SimpleDateFormat("yyyy-MM-dd hhmmss")
             .format(Date())
-        return "$mFileName/rcd_$s.mp3"
+        return "$mFilePath/audio_$s.mp3"
     }
 
     fun deleteFile(filePath: String): Boolean {
